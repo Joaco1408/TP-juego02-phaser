@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>El camino del guerrero</title>
+    <script src="js/phaser.js"></script>
+    <style type="text/css">
+        body {
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+
+<script type="text/javascript">
+
+var config = {
+    type: Phaser.AUTO,
+    width: 1600,
+    height: 900,
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: { y: 300 },
+            debug: false
+        }
+    },
+    scene: {
+        preload: preload,
+        create: create,
+        update: update
+    }
+};
+
+var player;
+var scrolls;
+var hongos;
+var platforms;
+var cursors;
+var score = 0;
+var gameOver = false;
+var scoreText;
+
+var game = new Phaser.Game(config);
+
+function preload ()
+{
+    this.load.image('fondo', 'assets/fondo.png');
+    this.load.image('ground', 'assets/suelito.png');
+    this.load.image('suelo', 'assets/suelo.png');
+
+    this.load.image('hongo', 'assets/hongo.png');
+    this.load.spritesheet('ninja', 'assets/ninja.png', { frameWidth: 32, frameHeight: 48 });
+    this.load.spritesheet('scroll', 'assets/scroll.png', { frameWidth: 33, frameHeight: 35 });
+}
+
+function create ()
+{
+    //  A simple background for our game
+    this.add.image(830, 375, 'fondo');
+
+    //  The platforms group contains the ground and the 2 ledges we can jump on
+    platforms = this.physics.add.staticGroup();
+
+    //  Here we create the ground.
+    //  Scale it to fit the width of the game (the original sprite is 400x32 in size)
+    platforms.create(832, 870, 'suelo').setScale(1).refreshBody();
+
+    //  Now let's create some ledges
+    //  X, Y
+    platforms.create(600, 400, 'ground');
+    platforms.create(50, 250, 'ground');
+    platforms.create(750, 220, 'ground');
+    platforms.create(200, 420, 'ground');
+    //platforms.create(250, 100, 'ground');
+    platforms.create(1000, 400, 'ground');
+    platforms.create(500, 700, 'ground');
+    platforms.create(900, 560, 'ground');
+    platforms.create(1500, 560, 'ground');
+    platforms.create(1200, 700, 'ground');
+
+    // The player and its settings
+    player = this.physics.add.sprite(100, 450, 'ninja');
+
+    //  Player physics properties. Give the little guy a slight bounce.
+    player.setBounce(0.2);
+    player.setCollideWorldBounds(true);
+
+    //  Our player animations, turning, walking left and walking right.
+    this.anims.create({
+        key: 'left',
+        frames: this.anims.generateFrameNumbers('ninja', { start: 0, end: 3 }),
+        frameRate: 10,
+        repeat: -1
+    });
+
+    this.anims.create({
+        key: 'turn',
+        frames: [ { key: 'ninja', frame: 4 } ],
+        frameRate: 20
+    });
+
+    this.anims.create({
+        key: 'right',
+        frames: this.anims.generateFrameNumbers('ninja', { start: 5, end: 8 }),
+        frameRate: 10,
+        repeat: -1
+    });
+
+    this.anims.create({
+        key:'spin',
+        frames: this.anims.generateFrameNumbers('scroll',{
+        start: 0, end: 10}),
+        framerate: 10,
+        repeat: -1
+    });
+
+    scrolls = this.physics.add.group({
+        key: 'scroll',
+        repeat: 12,
+        setXY:{ x: 41, y: 0, stepX: 128 }
+    });
+
+    scrolls.children.iterate(scrollsss => {
+        scrollsss.play('spin')})
+
+        scrolls.children.iterate(function (child){
+            child.setBounceY(Phaser.Math.FloatBetween(0.4, 0.8))});
+    //  Input Events
+    cursors = this.input.keyboard.createCursorKeys();
+
+
+    hongos = this.physics.add.group();
+
+    //  The score
+    scoreText = this.add.text(16, 16, 'score: 0', { fontSize: '32px', fill: '#000' });
+
+    //  Collide the player and the scrolls with the platforms
+    this.physics.add.collider(player, platforms);
+    this.physics.add.collider(scrolls, platforms);
+    this.physics.add.collider(hongos, platforms);
+
+    //  Checks to see if the player overlaps with any of the scrolls, if he does call the collectScroll function
+    this.physics.add.overlap(player, scrolls, collectScroll, null, this);
+
+    this.physics.add.collider(player, hongos, hitHongo, null, this);
+}
+
+function update ()
+{
+    if (gameOver)
+    {
+        return;
+    }
+
+    if (cursors.left.isDown)
+    {
+        player.setVelocityX(-160);
+
+        player.anims.play('left', true);
+    }
+    else if (cursors.right.isDown)
+    {
+        player.setVelocityX(160);
+
+        player.anims.play('right', true);
+    }
+    else
+    {
+        player.setVelocityX(0);
+
+        player.anims.play('turn');
+    }
+
+    if (cursors.up.isDown && player.body.touching.down)
+    {
+        player.setVelocityY(-330);
+    }
+}
+
+function collectScroll (player, scroll)
+{
+    scroll.disableBody(true, true);
+
+    //  Add and update the score
+    score += 10;
+    scoreText.setText('Score: ' + score);
+
+    if (scrolls.countActive(true) === 0)
+    {
+        //  A new batch of scrolls to collect
+        scrolls.children.iterate(function (child) {
+
+            child.enableBody(true, child.x, 0, true, true);
+
+        });
+
+        var x = (player.x < 400) ? Phaser.Math.Between(400, 800) : Phaser.Math.Between(0, 400);
+
+        var hongo = hongos.create(x, 16, 'hongo');
+        hongo.setBounce(1);
+        hongo.setCollideWorldBounds(true);
+        hongo.setVelocity(Phaser.Math.Between(-200, 200), 20);
+        hongo.allowGravity = false;
+
+    }
+}
+
+function hitHongo (player, hongo)
+{
+    this.physics.pause();
+
+    player.setTint(0xff0000);
+
+    player.anims.play('turn');
+
+    gameOver = true;
+}
+
+</script>
+
+</body>
+</html>
